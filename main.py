@@ -3,6 +3,7 @@ from PIL import Image, ImageSequence
 import io
 import openai
 import base64
+from urllib.request import urlopen
 
 # OpenAI API 키 입력 (환경 변수나 secrets.toml로 관리 권장)
 openai.api_key = st.secrets["openai_api_key"] if "openai_api_key" in st.secrets else "YOUR_OPENAI_API_KEY"
@@ -30,10 +31,10 @@ if uploaded_file:
 
     st.image(image, caption="원본 이미지", use_container_width=True)
 
-    selected_option = st.selectbox("용도를 선택해주세요", list(resize_options.keys()) + ["AI 배너 생성 (스타일 유지)"])
+    selected_option = st.selectbox("용도를 선택해주세요", list(resize_options.keys()) + ["AI 썸네일 자동 생성하기"])
     keep_ratio = st.checkbox("비율 유지 (여백 채움)", value=True)
 
-    if selected_option != "AI 배너 생성 (스타일 유지)":
+    if selected_option != "AI 썸네일 자동 생성하기":
         target_size = resize_options[selected_option]
         if st.button("리사이징 하기"):
             if is_gif:
@@ -100,40 +101,57 @@ if uploaded_file:
                 )
 
     else:
-        if is_gif:
-            st.warning("GIF 파일은 AI 배너 생성 기능에서 지원되지 않습니다.")
-        elif st.button("AI 배너 생성하기 (OpenAI DALL·E)"):
-            st.info("이미지 업로드 중... OpenAI API 호출 중입니다.")
+        st.subheader("🖌️ 썸네일 스타일 선택")
+        style = st.selectbox("스타일을 선택하세요", ["미니멀", "플랫 일러스트", "사진풍", "레트로", "심플 텍스트 중심"])
+        size_key = st.selectbox("썸네일 사이즈 선택", [
+            "썸네일 (300x300)",
+            "인스타 피드 (1080x1080)",
+            "유튜브 썸네일 (1280x720)",
+            "메인 신규 오픈 배너 (286x372)",
+            "메인 탑 콘텐츠 배너 (785x360)"
+        ])
+        target_dimensions = resize_options[size_key]
 
-            # 이미지를 1024x1024 RGB로 리사이징
-            square_size = 1024
-            base_img = image.convert("RGB")
-            resized_img = Image.new("RGB", (square_size, square_size), (255, 255, 255))
+        if st.button("AI 썸네일 자동 생성하기 (OpenAI DALL·E)"):
+            st.info("썸네일 디자인 자동 생성 중입니다...")
 
-            img_ratio = base_img.width / base_img.height
-            if img_ratio > 1:
-                new_width = square_size
-                new_height = int(square_size / img_ratio)
-            else:
-                new_height = square_size
-                new_width = int(square_size * img_ratio)
+            style_prompts = {
+                "미니멀": "minimalist, clean layout, bold title text area, flat color blocks",
+                "플랫 일러스트": "flat vector design, cartoon-style icons, modern education layout",
+                "사진풍": "realistic photo-style thumbnail with a professional teacher and student background",
+                "레트로": "retro 90s education magazine style, bold fonts, vintage layout",
+                "심플 텍스트 중심": "white background, clean typography, infographic-style layout"
+            }
 
-            img_resized = base_img.resize((new_width, new_height))
-            paste_x = (square_size - new_width) // 2
-            paste_y = (square_size - new_height) // 2
-            resized_img.paste(img_resized, (paste_x, paste_y))
-
-            buf = io.BytesIO()
-            resized_img.save(buf, format="PNG")
+            prompt = (
+                f"Create a promotional thumbnail in bright yellow and navy blue. "
+                f"{style_prompts[style]}. Include space for Korean title text, educational icons, and clean layout. "
+                f"Commercial use quality."
+            )
 
             try:
-                response = openai.Image.create_variation(
-                    image=buf.getvalue(),
+                response = openai.Image.create(
+                    prompt=prompt,
                     n=1,
                     size="1024x1024"
                 )
                 ai_image_url = response["data"][0]["url"]
-                st.image(ai_image_url, caption="🎨 AI가 생성한 배너형 이미지 (스타일 유지)", use_container_width=True)
-                st.markdown(f"[이미지 다운로드]({ai_image_url})")
+
+                ai_image = Image.open(urlopen(ai_image_url)).convert("RGB")
+                resized_img = ai_image.resize(target_dimensions)
+
+                st.image(resized_img, caption="✨ 자동 생성 및 리사이징된 썸네일", use_container_width=True)
+
+                buf = io.BytesIO()
+                resized_img.save(buf, format="JPEG")
+                byte_im = buf.getvalue()
+
+                st.download_button(
+                    label="📥 리사이징된 썸네일 다운로드",
+                    data=byte_im,
+                    file_name=f"thumbnail_{style.replace(' ', '_')}.jpg",
+                    mime="image/jpeg"
+                )
+
             except Exception as e:
                 st.error(f"OpenAI API 호출 오류: {e}")
