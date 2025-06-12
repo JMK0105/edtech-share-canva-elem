@@ -25,7 +25,7 @@ if uploaded_file:
     image = Image.open(uploaded_file)
     is_gif = image.format == "GIF"
 
-    st.image(image, caption="원본 이미지", use_column_width=True)
+    st.image(image, caption="원본 이미지", use_container_width=True)
 
     selected_option = st.selectbox("용도를 선택해주세요", list(resize_options.keys()) + ["AI 배너 생성 (스타일 유지)"])
     keep_ratio = st.checkbox("비율 유지 (여백 채움)", value=True)
@@ -60,7 +60,7 @@ if uploaded_file:
 
                 buf = io.BytesIO()
                 frames[0].save(buf, format='GIF', save_all=True, append_images=frames[1:], loop=0)
-                st.image(buf.getvalue(), caption="리사이징된 GIF", use_column_width=True)
+                st.image(buf.getvalue(), caption="리사이징된 GIF", use_container_width=True)
                 st.download_button("📥 GIF 다운로드", buf.getvalue(), file_name="resized.gif", mime="image/gif")
 
             else:
@@ -83,7 +83,7 @@ if uploaded_file:
                 else:
                     resized_img = image.resize(target_size)
 
-                st.image(resized_img, caption="리사이징된 이미지", use_column_width=True)
+                st.image(resized_img, caption="리사이징된 이미지", use_container_width=True)
 
                 buf = io.BytesIO()
                 resized_img.save(buf, format="JPEG")
