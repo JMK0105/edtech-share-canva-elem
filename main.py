@@ -13,10 +13,13 @@ st.write("업로드한 이미지를 원하는 용도로 리사이징하거나, A
 
 resize_options = {
     "썸네일 (300x300)": (300, 300),
+    "배너 (1200x400)": (1200, 400),
+    "인스타 피드 (1080x1080)": (1080, 1080),
+    "유튜브 썸네일 (1280x720)": (1280, 720),
+    "블로그 본문 (800x600)": (800, 600),
     "메인 탑 콘텐츠 배너 (785x360)": (785, 360),
     "메인 신규 오픈 배너 (286x372)": (286, 372),
-    "유튜브 썸네일 (1280x720)": (1280, 720),
-    "블로그 본문 (800x600)": (800, 600)
+    "메인 하단 이벤트 배너 (584x154)": (584, 154)
 }
 
 uploaded_file = st.file_uploader("이미지를 업로드하세요", type=["jpg", "jpeg", "png", "gif"])
@@ -102,9 +105,26 @@ if uploaded_file:
         elif st.button("AI 배너 생성하기 (OpenAI DALL·E)"):
             st.info("이미지 업로드 중... OpenAI API 호출 중입니다.")
 
+            # 이미지를 1024x1024 RGB로 리사이징
+            square_size = 1024
+            base_img = image.convert("RGB")
+            resized_img = Image.new("RGB", (square_size, square_size), (255, 255, 255))
+
+            img_ratio = base_img.width / base_img.height
+            if img_ratio > 1:
+                new_width = square_size
+                new_height = int(square_size / img_ratio)
+            else:
+                new_height = square_size
+                new_width = int(square_size * img_ratio)
+
+            img_resized = base_img.resize((new_width, new_height))
+            paste_x = (square_size - new_width) // 2
+            paste_y = (square_size - new_height) // 2
+            resized_img.paste(img_resized, (paste_x, paste_y))
+
             buf = io.BytesIO()
-            image.convert("RGB").save(buf, format="PNG")
-            base64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
+            resized_img.save(buf, format="PNG")
 
             try:
                 response = openai.Image.create_variation(
@@ -113,7 +133,7 @@ if uploaded_file:
                     size="1024x1024"
                 )
                 ai_image_url = response["data"][0]["url"]
-                st.image(ai_image_url, caption="🎨 AI가 생성한 배너형 이미지 (스타일 유지)")
+                st.image(ai_image_url, caption="🎨 AI가 생성한 배너형 이미지 (스타일 유지)", use_container_width=True)
                 st.markdown(f"[이미지 다운로드]({ai_image_url})")
             except Exception as e:
                 st.error(f"OpenAI API 호출 오류: {e}")
